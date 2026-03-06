@@ -21,6 +21,10 @@ services:
                   - url: "http://grafana:3000"
             rocketchat:
               loadBalancer:
+                healthCheck:
+                  path: /health
+                  interval: 10s
+                  timeout: 3s
                 servers:
         EOF
 
