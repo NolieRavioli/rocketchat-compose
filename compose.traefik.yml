@@ -69,7 +69,7 @@ services:
               service: rocketchat
               rule: Host(\`{{ env "DOMAIN" }}\`)
               tls:
-                $TLS_BLOCK
+                $$TLS_BLOCK
             grafana:
               entryPoints:
                 - https
@@ -81,7 +81,7 @@ services:
                 {{ end }}
               service: grafana
               tls:
-                $TLS_BLOCK
+                $$TLS_BLOCK
         TLSEOF
 
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
