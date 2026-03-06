@@ -4,6 +4,7 @@ services:
     entrypoint: sh
     environment:
       ROCKETCHAT_BACKEND_SERVERS: ${ROCKETCHAT_BACKEND_SERVERS:-rocketchat:3000}
+      LETSENCRYPT_ENABLED: ${LETSENCRYPT_ENABLED:-false}
     command:
       - -c
       - |-
@@ -84,6 +85,12 @@ services:
               tls:
                 certResolver: le
         EOF
+
+        # When Let's Encrypt is disabled, remove certResolver so Traefik
+        # uses its default self-signed certificate instead of attempting ACME
+        if [ "$$LETSENCRYPT_ENABLED" != "true" ]; then
+          sed -i 's/certResolver: le/{}/g' /traefik_config/https/dynamic.yml
+        fi
 
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
         cat /traefik_config/services.tpl >> /traefik_config/https/dynamic.yml
