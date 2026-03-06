@@ -4,6 +4,7 @@ services:
     entrypoint: sh
     environment:
       ROCKETCHAT_BACKEND_SERVERS: ${ROCKETCHAT_BACKEND_SERVERS:-rocketchat:3000}
+      LETSENCRYPT_ENABLED: ${LETSENCRYPT_ENABLED:-false}
     command:
       - -c
       - |-
@@ -54,36 +55,38 @@ services:
                 {{ end }}
         EOF
 
-        cat <<'EOF' > /traefik_config/https/dynamic.yml
-        https:
-          address: ":443"
-          http:
-            redirections:
-              entryPoint:
-                to: "http"
-                scheme: "https"
+        # Build the tls block conditionally:
+        # - With LE enabled: use certResolver to get a real cert
+        # - Without LE: empty tls block uses Traefik's default self-signed cert
+        if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
+          TLS_BLOCK='certResolver: le'
+        else
+          TLS_BLOCK='{}'
+        fi
+
+        cat > /traefik_config/https/dynamic.yml <<TLSEOF
         http:
           routers:
             rocketchat:
               entryPoints:
                 - https
               service: rocketchat
-              rule: Host(`{{ env "DOMAIN" }}`)
+              rule: Host(\`{{ env "DOMAIN" }}\`)
               tls:
-                certResolver: le
+                $$TLS_BLOCK
             grafana:
               entryPoints:
                 - https
               rule: |
                 {{ if eq (env "GRAFANA_DOMAIN") "" }}
-                  Host(`{{ env "DOMAIN" }}`) && PathPrefix(`{{ env "GRAFANA_PATH" }}`)
+                  Host(\`{{ env "DOMAIN" }}\`) && PathPrefix(\`{{ env "GRAFANA_PATH" }}\`)
                 {{ else }}
-                  Host(`{{ env "GRAFANA_DOMAIN" }}`)
+                  Host(\`{{ env "GRAFANA_DOMAIN" }}\`)
                 {{ end }}
               service: grafana
               tls:
-                certResolver: le
-        EOF
+                $$TLS_BLOCK
+        TLSEOF
 
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
         cat /traefik_config/services.tpl >> /traefik_config/https/dynamic.yml
@@ -111,7 +114,6 @@ services:
       - --api.insecure=${TRAEFIK_API_INSECURE:-false}
       - --providers.docker=false
       - --providers.docker.exposedbydefault=false
-      - --entrypoints.http.address=:${TRAEFIK_HTTP_PORT:-80}
       - --entrypoints.https.address=:${TRAEFIK_HTTPS_PORT:-443}
       - --entrypoints.metrics.address=:9096
       - --metrics.prometheus=true
@@ -127,12 +129,10 @@ services:
       - --providers.file.filename=/traefik_config/${TRAEFIK_PROTOCOL}/dynamic.yml
       - --providers.file.watch=true
     ports:
-      - ${TRAEFIK_HTTP_PORT:-80}:${TRAEFIK_HTTP_PORT:-80}
       - ${TRAEFIK_DASHBOARD_PORT:-8080}:8080
       - ${TRAEFIK_HTTPS_PORT:-443}:${TRAEFIK_HTTPS_PORT:-443}
     expose:
       - 9096
-      - ${TRAEFIK_HTTP_PORT:-80}
       - ${TRAEFIK_DASHBOARD_PORT:-8080}
       - ${TRAEFIK_HTTPS_PORT:-443}
     volumes:
