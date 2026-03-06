@@ -18,6 +18,14 @@ services:
       MONGO_URL: ${MONGO_URL:-mongodb://mongodb:27017/rocketchat?replicaSet=rs0}
       TRANSPORTER: "${NATS_URL-monolith+nats://nats:4222}"
       INSTANCE_IP: "${INSTANCE_IP:-}"
+      # SMTP Configuration
+      OVERWRITE_SETTING_SMTP_Host: ${SMTP_HOST:-}
+      OVERWRITE_SETTING_SMTP_Port: ${SMTP_PORT:-587}
+      OVERWRITE_SETTING_SMTP_Username: ${SMTP_USERNAME:-}
+      OVERWRITE_SETTING_SMTP_Password: ${SMTP_PASSWORD:-}
+      OVERWRITE_SETTING_From_Email: ${SMTP_FROM_EMAIL:-noreply@localhost}
+      OVERWRITE_SETTING_SMTP_Protocol: ${SMTP_PROTOCOL:-smtp}
+      OVERWRITE_SETTING_SMTP_IgnoreTLS: ${SMTP_IGNORE_TLS:-false}
     # depends_on:
     #   mongodb-init-container:
     #     condition: service_completed_successfully

@@ -77,6 +77,17 @@
       GRAFANA_PATH=/grafana
       # Should match your domain; use https if enabled
       ROOT_URL=https://localhost
+      # SMTP Configuration
+      # Leave blank to skip SMTP configuration
+      SMTP_HOST=
+      SMTP_PORT=587
+      SMTP_USERNAME=
+      SMTP_PASSWORD=
+      SMTP_FROM_EMAIL=noreply@localhost
+      # Protocol: smtp or smtps
+      SMTP_PROTOCOL=smtp
+      # Set to true to ignore TLS/SSL errors (not recommended for production)
+      SMTP_IGNORE_TLS=false
       ```
 
  2. **Using Grafana as a Subdomain instead of Path:**
