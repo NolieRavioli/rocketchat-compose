@@ -21,10 +21,6 @@ services:
                   - url: "http://grafana:3000"
             rocketchat:
               loadBalancer:
-                healthCheck:
-                  path: /health
-                  interval: 10s
-                  timeout: 3s
                 servers:
         EOF
 
@@ -55,42 +51,38 @@ services:
                 {{ end }}
         EOF
 
-        cat <<'EOF' > /traefik_config/https/dynamic.yml
-        https:
-          address: ":443"
-          http:
-            redirections:
-              entryPoint:
-                to: "http"
-                scheme: "https"
+        # Build the tls block conditionally:
+        # - With LE enabled: use certResolver to get a real cert
+        # - Without LE: empty tls block uses Traefik's default self-signed cert
+        if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
+          TLS_BLOCK='certResolver: le'
+        else
+          TLS_BLOCK='{}'
+        fi
+
+        cat > /traefik_config/https/dynamic.yml <<TLSEOF
         http:
           routers:
             rocketchat:
               entryPoints:
                 - https
               service: rocketchat
-              rule: Host(`{{ env "DOMAIN" }}`)
+              rule: Host(\`{{ env "DOMAIN" }}\`)
               tls:
-                certResolver: le
+                $TLS_BLOCK
             grafana:
               entryPoints:
                 - https
               rule: |
                 {{ if eq (env "GRAFANA_DOMAIN") "" }}
-                  Host(`{{ env "DOMAIN" }}`) && PathPrefix(`{{ env "GRAFANA_PATH" }}`)
+                  Host(\`{{ env "DOMAIN" }}\`) && PathPrefix(\`{{ env "GRAFANA_PATH" }}\`)
                 {{ else }}
-                  Host(`{{ env "GRAFANA_DOMAIN" }}`)
+                  Host(\`{{ env "GRAFANA_DOMAIN" }}\`)
                 {{ end }}
               service: grafana
               tls:
-                certResolver: le
-        EOF
-
-        # When Let's Encrypt is disabled, remove certResolver so Traefik
-        # uses its default self-signed certificate instead of attempting ACME
-        if [ "$$LETSENCRYPT_ENABLED" != "true" ]; then
-          sed -i 's/certResolver: le/{}/g' /traefik_config/https/dynamic.yml
-        fi
+                $TLS_BLOCK
+        TLSEOF
 
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
         cat /traefik_config/services.tpl >> /traefik_config/https/dynamic.yml
