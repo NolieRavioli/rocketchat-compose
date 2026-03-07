@@ -358,7 +358,7 @@ services:
       # ssl
 
       - --certificatesresolvers.le.acme.tlschallenge=${LETSENCRYPT_ENABLED:-false}
-      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL?need email for cert expiry notifications}
+      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL:-demo@email.com}
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       # ssl
 
