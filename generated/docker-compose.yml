@@ -212,10 +212,41 @@ services:
       - -c
       - |-
         set -e
-        # quote 'eof' to prevent variable expansion
         rm -rf /traefik_config/* || true
         mkdir -p /traefik_config/http /traefik_config/https
-        # this should be idented so it works inside the heredoc concatenation later
+        # Set TLS block early so it is available for the Jitsi https snippet below
+        if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
+          TLS_BLOCK='certResolver: le'
+        else
+          TLS_BLOCK='{}'
+        fi
+        # Pre-write optional Jitsi config snippets at base indentation level.
+        # Heredoc terminators inside if-blocks gain 2 leading spaces from YAML
+        # block-scalar stripping, rendering as "  EOF" which sh rejects (must be
+        # at column 0). Pre-writing to temp files here avoids the issue entirely.
+        cat <<'EOF' > /traefik_config/jitsi_svc.tpl
+            jitsi:
+              loadBalancer:
+                servers:
+                  - url: "http://web:80"
+        EOF
+        cat <<'EOF' > /traefik_config/jitsi_http.tpl
+            jitsi:
+              entryPoints:
+                - http
+              service: jitsi
+              rule: Host(`{{ env "JITSI_DOMAIN" }}`) && PathPrefix(`/`)
+        EOF
+        cat > /traefik_config/jitsi_https.tpl <<JITSI_HTTPS
+            jitsi:
+              entryPoints:
+                - https
+              service: jitsi
+              rule: Host(\`{{ env "JITSI_DOMAIN" }}\`)
+              tls:
+                $$TLS_BLOCK
+        JITSI_HTTPS
+        # this should be indented so it works inside the heredoc concatenation later
         cat <<'EOF' > /traefik_config/services.tpl
           services:
             grafana:
@@ -238,12 +269,7 @@ services:
         done
 
         if [ "$$ENABLE_JITSI" = "true" ]; then
-          cat <<'EOF' >> /traefik_config/services.tpl
-            jitsi:
-              loadBalancer:
-                servers:
-                  - url: "http://web:80"
-          EOF
+          cat /traefik_config/jitsi_svc.tpl >> /traefik_config/services.tpl
         fi
 
 
@@ -268,22 +294,7 @@ services:
         EOF
 
         if [ "$$ENABLE_JITSI" = "true" ]; then
-          cat <<'EOF' >> /traefik_config/http/dynamic.yml
-            jitsi:
-              entryPoints:
-                - http
-              service: jitsi
-              rule: Host(`{{ env "JITSI_DOMAIN" }}`) && PathPrefix(`/`)
-          EOF
-        fi
-
-        # Build the tls block conditionally:
-        # - With LE enabled: use certResolver to get a real cert
-        # - Without LE: empty tls block uses Traefik's default self-signed cert
-        if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
-          TLS_BLOCK='certResolver: le'
-        else
-          TLS_BLOCK='{}'
+          cat /traefik_config/jitsi_http.tpl >> /traefik_config/http/dynamic.yml
         fi
 
         cat > /traefik_config/https/dynamic.yml <<TLSEOF
@@ -311,19 +322,7 @@ services:
         TLSEOF
 
         if [ "$$ENABLE_JITSI" = "true" ]; then
-          cat >> /traefik_config/https/dynamic.yml <<'EOF'
-            jitsi:
-              entryPoints:
-                - https
-              service: jitsi
-              rule: Host(\`{{ env "JITSI_DOMAIN" }}\`)
-              tls:
-          EOF
-          if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
-            echo "                certResolver: le" >> /traefik_config/https/dynamic.yml
-          else
-            echo "                {}" >> /traefik_config/https/dynamic.yml
-          fi
+          cat /traefik_config/jitsi_https.tpl >> /traefik_config/https/dynamic.yml
         fi
 
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
