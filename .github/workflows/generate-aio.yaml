@@ -33,11 +33,18 @@ jobs:
           yq eval-all '. as $item ireduce ({}; . * $item)' \
             compose.yml \
             compose.database.yml \
+            compose.traefik.yml \
+            compose.jitsi.yml \
+            | tee generated/docker-compose-jitsi.yml
+
+          yq eval-all '. as $item ireduce ({}; . * $item)' \
+            compose.yml \
+            compose.database.yml \
             | tee generated/docker-compose-no-traefik.yml
 
       - name: Push to master
         uses: EndBug/add-and-commit@v9
         with:
           add: "generated/"
-          message: "Generated docker-compose.yml in generated/docker-compose.yml"
+          message: "Update generated docker-compose bundles"
           push: true

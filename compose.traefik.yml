@@ -5,6 +5,7 @@ services:
     environment:
       ROCKETCHAT_BACKEND_SERVERS: ${ROCKETCHAT_BACKEND_SERVERS:-rocketchat:3000}
       LETSENCRYPT_ENABLED: ${LETSENCRYPT_ENABLED:-false}
+      ENABLE_JITSI: ${ENABLE_JITSI:-false}
     command:
       - -c
       - |-
@@ -34,6 +35,15 @@ services:
           echo "          - url: \"http://$$server\"" >> /traefik_config/services.tpl
         done
 
+        if [ "$$ENABLE_JITSI" = "true" ]; then
+          cat <<'EOF' >> /traefik_config/services.tpl
+            jitsi:
+              loadBalancer:
+                servers:
+                  - url: "http://web:80"
+          EOF
+        fi
+
 
         cat <<'EOF' > /traefik_config/http/dynamic.yml
         http:
@@ -54,6 +64,16 @@ services:
                   Host(`{{ env "GRAFANA_DOMAIN" }}`)
                 {{ end }}
         EOF
+
+        if [ "$$ENABLE_JITSI" = "true" ]; then
+          cat <<'EOF' >> /traefik_config/http/dynamic.yml
+            jitsi:
+              entryPoints:
+                - http
+              service: jitsi
+              rule: Host(`{{ env "JITSI_DOMAIN" }}`) && PathPrefix(`/`)
+          EOF
+        fi
 
         # Build the tls block conditionally:
         # - With LE enabled: use certResolver to get a real cert
@@ -88,6 +108,22 @@ services:
                 $$TLS_BLOCK
         TLSEOF
 
+        if [ "$$ENABLE_JITSI" = "true" ]; then
+          cat >> /traefik_config/https/dynamic.yml <<'EOF'
+            jitsi:
+              entryPoints:
+                - https
+              service: jitsi
+              rule: Host(\`{{ env "JITSI_DOMAIN" }}\`)
+              tls:
+          EOF
+          if [ "$$LETSENCRYPT_ENABLED" = "true" ]; then
+            echo "                certResolver: le" >> /traefik_config/https/dynamic.yml
+          else
+            echo "                {}" >> /traefik_config/https/dynamic.yml
+          fi
+        fi
+
         cat /traefik_config/services.tpl >> /traefik_config/http/dynamic.yml
         cat /traefik_config/services.tpl >> /traefik_config/https/dynamic.yml
         cat /traefik_config/http/dynamic.yml
@@ -109,6 +145,7 @@ services:
       DOMAIN: "${DOMAIN:-localhost}"
       GRAFANA_DOMAIN: "${GRAFANA_DOMAIN-}"
       GRAFANA_PATH: "${GRAFANA_PATH-/}"
+      JITSI_DOMAIN: "${JITSI_DOMAIN:-meet.localhost}"
       TRAEFIK_PROTOCOL: "${TRAEFIK_PROTOCOL-}"
     command:
       - --api.insecure=${TRAEFIK_API_INSECURE:-false}

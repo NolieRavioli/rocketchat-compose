@@ -393,6 +393,140 @@ services:
       driver: "json-file"
     labels:
       container_tag: "${COMPOSE_PROJECT_NAME:-rocketchat}#traefik"
+  web:
+    image: docker.io/jitsi/web:${JITSI_IMAGE_VERSION:-stable-10741}
+    restart: always
+    ports:
+      - "127.0.0.1:${JITSI_HTTP_PORT:-8000}:80"
+    expose:
+      - "80"
+    volumes:
+      - jitsi_web_config:/config:Z
+      - jitsi_web_crontabs:/var/spool/cron/crontabs:Z
+      - jitsi_transcripts:/usr/share/jitsi-meet/transcripts:Z
+      - jitsi_web_load_test:/usr/share/jitsi-meet/load-test:Z
+    labels:
+      container_tag: "${COMPOSE_PROJECT_NAME:-rocketchat}#jitsi-web"
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:?set JITSI_PUBLIC_URL}
+      DISABLE_HTTPS: "${JITSI_DISABLE_HTTPS:-1}"
+      ENABLE_HTTP_REDIRECT: "${JITSI_ENABLE_HTTP_REDIRECT:-0}"
+      ENABLE_XMPP_WEBSOCKET: "${JITSI_ENABLE_XMPP_WEBSOCKET:-1}"
+      ENABLE_COLIBRI_WEBSOCKET: "${JITSI_ENABLE_COLIBRI_WEBSOCKET:-1}"
+      COLIBRI_WEBSOCKET_PORT: "${TRAEFIK_HTTPS_PORT:-443}"
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+      XMPP_BOSH_URL_BASE: ${JITSI_XMPP_BOSH_URL_BASE:-http://xmpp.meet.jitsi:5280}
+      XMPP_GUEST_DOMAIN: ${JITSI_XMPP_GUEST_DOMAIN:-guest.meet.jitsi}
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.meet.jitsi}
+      XMPP_HIDDEN_DOMAIN: ${JITSI_XMPP_HIDDEN_DOMAIN:-hidden.meet.jitsi}
+      XMPP_RECORDER_DOMAIN: ${JITSI_XMPP_RECORDER_DOMAIN:-recorder.meet.jitsi}
+    depends_on:
+      - jvb
+    networks:
+      - default
+      - meet.jitsi
+  prosody:
+    image: docker.io/jitsi/prosody:${JITSI_IMAGE_VERSION:-stable-10741}
+    restart: always
+    expose:
+      - "${JITSI_XMPP_PORT:-5222}"
+      - "${JITSI_PROSODY_S2S_PORT:-5269}"
+      - "5347"
+      - "${JITSI_PROSODY_HTTP_PORT:-5280}"
+    volumes:
+      - jitsi_prosody_config:/config:Z
+      - jitsi_prosody_plugins:/prosody-plugins-custom:Z
+    labels:
+      container_tag: "${COMPOSE_PROJECT_NAME:-rocketchat}#jitsi-prosody"
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:?set JITSI_PUBLIC_URL}
+      AUTH_TYPE: ${JITSI_AUTH_TYPE:-internal}
+      ENABLE_AUTH: "${JITSI_ENABLE_AUTH:-0}"
+      ENABLE_GUESTS: "${JITSI_ENABLE_GUESTS:-0}"
+      ENABLE_XMPP_WEBSOCKET: "${JITSI_ENABLE_XMPP_WEBSOCKET:-1}"
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD:?set JITSI_JICOFO_AUTH_PASSWORD}
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD:?set JITSI_JVB_AUTH_PASSWORD}
+      JVB_AUTH_USER: ${JITSI_JVB_AUTH_USER:-jvb}
+      PROSODY_HTTP_PORT: "${JITSI_PROSODY_HTTP_PORT:-5280}"
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+      XMPP_GUEST_DOMAIN: ${JITSI_XMPP_GUEST_DOMAIN:-guest.meet.jitsi}
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.meet.jitsi}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.meet.jitsi}
+      XMPP_SERVER_S2S_PORT: "${JITSI_PROSODY_S2S_PORT:-5269}"
+    networks:
+      meet.jitsi:
+        aliases:
+          - ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+  jicofo:
+    image: docker.io/jitsi/jicofo:${JITSI_IMAGE_VERSION:-stable-10741}
+    restart: always
+    ports:
+      - "127.0.0.1:${JITSI_JICOFO_REST_PORT:-8888}:8888"
+    volumes:
+      - jitsi_jicofo_config:/config:Z
+    labels:
+      container_tag: "${COMPOSE_PROJECT_NAME:-rocketchat}#jitsi-jicofo"
+    environment:
+      TZ: ${TZ:-UTC}
+      AUTH_TYPE: ${JITSI_AUTH_TYPE:-internal}
+      ENABLE_AUTH: "${JITSI_ENABLE_AUTH:-0}"
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD:?set JITSI_JICOFO_AUTH_PASSWORD}
+      JVB_BREWERY_MUC: ${JITSI_JVB_BREWERY_MUC:-jvbbrewery}
+      JVB_XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      JVB_XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.meet.jitsi}
+      JVB_XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+      JVB_XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.meet.jitsi}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.meet.jitsi}
+      XMPP_RECORDER_DOMAIN: ${JITSI_XMPP_RECORDER_DOMAIN:-recorder.meet.jitsi}
+    depends_on:
+      - prosody
+    networks:
+      - meet.jitsi
+  jvb:
+    image: docker.io/jitsi/jvb:${JITSI_IMAGE_VERSION:-stable-10741}
+    restart: always
+    ports:
+      - "${JITSI_JVB_PORT:-10000}:${JITSI_JVB_PORT:-10000}/udp"
+      - "127.0.0.1:${JITSI_JVB_COLIBRI_PORT:-8080}:8080"
+    volumes:
+      - jitsi_jvb_config:/config:Z
+    labels:
+      container_tag: "${COMPOSE_PROJECT_NAME:-rocketchat}#jitsi-jvb"
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:?set JITSI_PUBLIC_URL}
+      ENABLE_COLIBRI_WEBSOCKET: "${JITSI_ENABLE_COLIBRI_WEBSOCKET:-1}"
+      JVB_ADVERTISE_IPS: ${JITSI_JVB_ADVERTISE_IPS:?set JITSI_JVB_ADVERTISE_IPS}
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD:?set JITSI_JVB_AUTH_PASSWORD}
+      JVB_AUTH_USER: ${JITSI_JVB_AUTH_USER:-jvb}
+      JVB_DISABLE_STUN: "${JITSI_JVB_DISABLE_STUN:-0}"
+      JVB_PORT: "${JITSI_JVB_PORT:-10000}"
+      JVB_WS_DOMAIN: ${JITSI_DOMAIN:-meet.localhost}
+      JVB_XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      JVB_XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.meet.jitsi}
+      JVB_XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+      JVB_XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.meet.jitsi}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.meet.jitsi}
+      XMPP_SERVER: ${JITSI_XMPP_SERVER:-xmpp.meet.jitsi}
+      XMPP_PORT: "${JITSI_XMPP_PORT:-5222}"
+    depends_on:
+      - prosody
+    networks:
+      - meet.jitsi
 volumes:
   mongodb_data:
     driver: local
@@ -401,6 +535,24 @@ volumes:
     driver: local
   traefik_config:
     driver: local
+  jitsi_jicofo_config:
+    driver: local
+  jitsi_jvb_config:
+    driver: local
+  jitsi_prosody_config:
+    driver: local
+  jitsi_prosody_plugins:
+    driver: local
+  jitsi_transcripts:
+    driver: local
+  jitsi_web_config:
+    driver: local
+  jitsi_web_crontabs:
+    driver: local
+  jitsi_web_load_test:
+    driver: local
+networks:
+  meet.jitsi:
 #   test: ["CMD", "nc", "-zv", "-w", "10", "rocketchat", "${PORT:-3000}"]
 
 #   interval: 30s

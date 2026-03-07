@@ -1,6 +1,6 @@
 # Rocket.Chat Compose Files
 
- Compose files for running Rocket.Chat with Traefik, MongoDB, NATS, and optional monitoring.
+ Compose files for running Rocket.Chat with Traefik, MongoDB, NATS, optional Jitsi, and optional monitoring.
 
 ## Important Note!
 
@@ -16,6 +16,7 @@
  4. Copy the example environment file: `cp .env.example .env`
  5. Edit `nano .env` file and update values
  6. Start the stack: `docker compose -f compose.database.yml -f compose.traefik.yml -f compose.yml up -d --force-recreate`
+ 7. If you want Jitsi, set `ENABLE_JITSI=true` in `.env` and add `-f compose.jitsi.yml`
 
  You can access Rocket.Chat at: https://localhost
 
@@ -23,6 +24,8 @@
 
    - User: admin
    - Password: pass
+
+ If Jitsi is enabled, it will be available at: https://meet.localhost
 
 ## Getting Started
 
@@ -72,6 +75,16 @@
       LETSENCRYPT_EMAIL=
       # Domain for Rocket.Chat
       DOMAIN=localhost
+      # Enable Jitsi only when you include compose.jitsi.yml
+      ENABLE_JITSI=false
+      # Domain and public URL for Jitsi
+      JITSI_DOMAIN=meet.localhost
+      JITSI_PUBLIC_URL=https://meet.localhost
+      # Required for Jitsi media. Use the IP clients reach for this host.
+      JITSI_JVB_ADVERTISE_IPS=
+      # Required service passwords for Jitsi
+      JITSI_JICOFO_AUTH_PASSWORD=
+      JITSI_JVB_AUTH_PASSWORD=
       # Domain for Grafana, blank to use as a path
       GRAFANA_DOMAIN=
       GRAFANA_PATH=/grafana
@@ -121,6 +134,17 @@
         -f docker.yml \
         up -d
       ```
+    - To include Jitsi, add `-f compose.jitsi.yml` before `-f compose.yml`:
+      ```bash
+      docker compose \
+        -f compose.monitoring.yml \
+        -f compose.traefik.yml \
+        -f compose.database.yml \
+        -f compose.jitsi.yml \
+        -f compose.yml \
+        -f docker.yml \
+        up -d
+      ```
     - Or with Podman Compose (rootless, recommended):
       ```bash
       podman compose \
@@ -131,6 +155,7 @@
         -f podman.yml \
         up -d
       ```
+    - To include Jitsi with Podman, add `-f compose.jitsi.yml` before `-f compose.yml`.
     - If your Podman setup requires rootful mode, use:
       ```bash
       podman compose \
@@ -141,8 +166,9 @@
         -f podman-rootful.yml \
         up -d
       ```
+    - To include Jitsi with rootful Podman, add `-f compose.jitsi.yml` before `-f compose.yml`.
 
-    This will launch all containers. Rocket.Chat will be available at [http://localhost](http://localhost), and Grafana at [http://grafana.localhost](http://grafana.localhost).
+    This will launch all containers. Rocket.Chat will be available at [https://localhost](https://localhost), Grafana at [https://localhost/grafana](https://localhost/grafana), and Jitsi at [https://meet.localhost](https://meet.localhost) when enabled.
 
     > **Note:** Rootless Podman is preferred for security and compatibility. Use rootful mode only if required by your environment. If deploying to a custom domain, update `ROOT_URL` and related variables accordingly.
 
@@ -150,8 +176,15 @@
 
     - With Docker Compose:
       ```bash
-      docker compose -f docker.yml --profile '*' down
+      docker compose \
+        -f compose.monitoring.yml \
+        -f compose.traefik.yml \
+        -f compose.database.yml \
+        -f compose.yml \
+        -f docker.yml \
+        down
       ```
+    - If you started Jitsi, include `-f compose.jitsi.yml` in the same command.
     - Or with Podman Compose:
       ```bash
       podman compose \
@@ -162,6 +195,52 @@
         -f podman.yml \
         down
       ```
+    - If you started Jitsi with Podman, include `-f compose.jitsi.yml` in the same command.
+
+---
+
+### Jitsi setup
+
+ To add Jitsi to the stack:
+
+ 1. Set `ENABLE_JITSI=true` in `.env`.
+ 2. Set `JITSI_DOMAIN` and `JITSI_PUBLIC_URL` to the hostname clients will use for Jitsi.
+ 3. Set `JITSI_JVB_ADVERTISE_IPS` to the IP address clients use to reach the Docker host.
+ 4. Set strong unique values for `JITSI_JICOFO_AUTH_PASSWORD` and `JITSI_JVB_AUTH_PASSWORD`.
+ 5. Start the stack with `-f compose.jitsi.yml`.
+
+ Important notes:
+
+ - `localhost` only works for single-machine testing. If other users will join from the LAN, use real DNS or host-file entries for both `DOMAIN` and `JITSI_DOMAIN`.
+ - Jitsi requires UDP `10000` to reach the host for media.
+ - This repo runs Jitsi behind Traefik on a dedicated hostname. Do not try to serve Jitsi from a subpath.
+
+ To finish the Rocket.Chat integration:
+
+ 1. Install the **Jitsi** app from the Rocket.Chat Marketplace.
+ 2. In the app settings, set **Domain** to your `JITSI_DOMAIN`.
+ 3. Enable **Use SSL** when `JITSI_PUBLIC_URL` uses `https`.
+ 4. Leave JWT disabled unless you are intentionally configuring token auth on both sides.
+
+ The default Jitsi image pin is `stable-10741`, which satisfies Rocket.Chat desktop support requirements for Jitsi `2.0.10073` or newer.
+
+---
+
+### Generated AIO files
+
+ The `generated/` directory contains pre-merged compose bundles:
+
+ - `generated/docker-compose.yml`: Rocket.Chat + MongoDB + Traefik
+ - `generated/docker-compose-jitsi.yml`: Rocket.Chat + MongoDB + Traefik + Jitsi
+ - `generated/docker-compose-no-traefik.yml`: Rocket.Chat + MongoDB
+
+ Example:
+
+ ```bash
+ docker compose -f generated/docker-compose-jitsi.yml up -d
+ ```
+
+ These generated bundles do not include the monitoring overlay.
 
 ---
 
